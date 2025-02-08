@@ -1,4 +1,3 @@
-import importlib.metadata
 import logging
 import os
 import signal
@@ -11,10 +10,10 @@ from typing import Literal
 import click
 from pick import pick
 
-
+from . import __version__
 from .chat import chat
-from .config import get_config
 from .commands import _gen_help
+from .config import get_config
 from .constants import MULTIPROMPT_SEPARATOR
 from .dirs import get_logs_dir
 from .init import init_logging
@@ -22,7 +21,7 @@ from .llm.models import get_recommended_model
 from .logmanager import ConversationMeta, get_user_conversations
 from .message import Message
 from .prompts import get_prompt
-from .tools import ToolFormat, init_tools, get_available_tools
+from .tools import ToolFormat, get_available_tools, init_tools
 from .util import epoch_to_age
 from .util.generate_name import generate_name
 from .util.interrupt import handle_keyboard_interrupt, set_interruptible
@@ -137,6 +136,11 @@ The interface provides user commands that can be used to interact with the syste
     is_flag=True,
     help="Show version and configuration information",
 )
+@click.option(
+    "--print-only",
+    is_flag=True,
+    help="Only print the query and exit without processing",
+)
 def main(
     prompts: list[str],
     prompt_system: str,
@@ -152,11 +156,17 @@ def main(
     version: bool,
     resume: bool,
     workspace: str | None,
+    print_only: bool,
 ):
     """Main entrypoint for the CLI."""
+    if print_only:
+        # Join prompts with spaces and print
+        print(" ".join(prompts))
+        sys.exit(0)
+
     if version:
         # print version
-        print(f"gptme {importlib.metadata.version('gptme')}")
+        print(f"gptme v{__version__}")
 
         # print dirs
         print(f"Logs dir: {get_logs_dir()}")
@@ -209,16 +219,6 @@ def main(
             # Attempt to switch to interactive mode
             # https://github.com/prompt-toolkit/python-prompt-toolkit/issues/502#issuecomment-466591259
             sys.stdin = sys.stdout
-
-            # Old code, doesn't work with prompt-toolkit
-            # sys.stdin.close()
-            # try:
-            #     sys.stdin = open("/dev/tty")
-            # except OSError:
-            #     # if we can't open /dev/tty, we're probably in a CI environment, so we should just continue
-            #     logger.warning(
-            #         "Failed to switch to interactive mode, continuing in non-interactive mode"
-            #     )
 
     # add prompts to prompt-toolkit history
     for prompt in prompts:
@@ -288,7 +288,10 @@ def main(
             selected_tool_format,
         )
     except RuntimeError as e:
-        logger.error(e)
+        if verbose:
+            logger.exception(e)
+        else:
+            logger.error(e)
         sys.exit(1)
 
 
@@ -334,12 +337,6 @@ def pick_log(limit=20) -> Path:  # pragma: no cover
 
     # load conversations
     convs.extend(islice(gen_convs, limit))
-
-    # filter out test conversations
-    # TODO: save test convos to different folder instead
-    # def is_test(name: str) -> bool:
-    #     return "-test-" in name or name.startswith("test-")
-    # prev_conv_files = [f for f in prev_conv_files if not is_test(f.parent.name)]
 
     terminal_width = os.get_terminal_size().columns
 
