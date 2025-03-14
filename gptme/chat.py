@@ -16,6 +16,7 @@ from .init import init
 from .llm import reply
 from .llm.models import get_model
 from .logmanager import Log, LogManager, prepare_messages
+from .mcp import detect_mcp_config, load_mcp_config
 from .message import Message
 from .prompts import get_workspace_prompt
 from .tools import (
@@ -98,6 +99,20 @@ def chat(
             log_workspace.symlink_to(workspace, target_is_directory=True)
         assert workspace.exists(), f"Workspace path {workspace} does not exist"
     console.log(f"Using workspace at {path_with_tilde(workspace)}")
+    
+    # Check for MCP configuration in the workspace
+    mcp_config_path = detect_mcp_config(workspace)
+    if mcp_config_path:
+        try:
+            mcp_config = load_mcp_config(mcp_config_path)
+            console.log(f"[bold green]MCP configuration detected:[/bold green] {path_with_tilde(mcp_config_path)}")
+            
+            # Check for sequential-thinking
+            if "sequential-thinking" in mcp_config:
+                console.log("[bold green]Sequential thinking enabled in MCP configuration[/bold green]")
+                
+        except Exception as e:
+            logger.warning(f"Error loading MCP configuration: {e}")
     os.chdir(workspace)
 
     workspace_prompt = get_workspace_prompt(workspace)
