@@ -16,7 +16,7 @@ from .init import init
 from .llm import reply
 from .llm.models import get_model
 from .logmanager import Log, LogManager, prepare_messages
-from .mcp import detect_mcp_config, load_mcp_config
+from .mcp import detect_mcp_config, load_mcp_config, display_mcp_info, display_sequential_thinking_status
 from .message import Message
 from .prompts import get_workspace_prompt
 from .tools import (
@@ -100,16 +100,23 @@ def chat(
         assert workspace.exists(), f"Workspace path {workspace} does not exist"
     console.log(f"Using workspace at {path_with_tilde(workspace)}")
     
-    # Check for MCP configuration in the workspace
+    # Check for MCP configuration in the workspace and display with fancy TUI
     mcp_config_path = detect_mcp_config(workspace)
     if mcp_config_path:
         try:
+            # Display MCP configuration with fancy TUI
+            display_mcp_info(mcp_config_path, console=console)
+            
+            # Load config for logging
             mcp_config = load_mcp_config(mcp_config_path)
-            console.log(f"[bold green]MCP configuration detected:[/bold green] {path_with_tilde(mcp_config_path)}")
+            logger.info(f"MCP configuration detected: {path_with_tilde(mcp_config_path)}")
             
             # Check for sequential-thinking
             if "sequential-thinking" in mcp_config:
-                console.log("[bold green]Sequential thinking enabled in MCP configuration[/bold green]")
+                logger.info("Sequential thinking enabled in MCP configuration")
+                # Display focused sequential thinking panel
+                console.print()  # Add a blank line for spacing
+                display_sequential_thinking_status(MCPClient(mcp_config_path), console=console)
                 
         except Exception as e:
             logger.warning(f"Error loading MCP configuration: {e}")
